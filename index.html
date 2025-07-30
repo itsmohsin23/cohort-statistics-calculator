@@ -62,8 +62,16 @@
     <p>
         Use this tool to combine the sample size (<em>n</em>), mean and standard deviation (SD) of up to 10 subgroups and obtain the overall mean, standard deviation and total sample size. All inputs are required for each subgroup. The calculations use the pooled sample variance formula.
     </p>
-    <label for="numGroups">Number of subgroups (1‑10):</label>
-    <input type="number" id="numGroups" name="numGroups" min="1" max="10" value="2">
+    <label for="numGroups"><strong>Number of studies (2–10):</strong></label>
+<input id="numGroups"
+       type="number"
+       min="2"
+       max="10"
+       step="1"
+       value="2"
+       inputmode="numeric"
+       pattern="[0-9]*"
+       style="width: 80px; margin-left: 6px;" />
     <table id="inputTable">
         <thead>
             <tr>
