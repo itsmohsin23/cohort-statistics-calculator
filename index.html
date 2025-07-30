@@ -87,25 +87,19 @@
     </table>
     <button id="calculateBtn" class="btn">Calculate</button>
     <div id="results" class="result"></div>
-    <script>
-(function() {
+   <script>
+(function () {
   const MIN_GROUPS = 2;
   const MAX_GROUPS = 10;
 
   const numGroupsInput = document.getElementById('numGroups');
-  const inputTableBody = document.getElementById('inputTable').querySelector('tbody');
+  const inputTableBody = document.querySelector('#inputTable tbody');
 
-  function clamp(v) {
-    const n = parseInt(v, 10);
-    if (Number.isNaN(n)) return MIN_GROUPS;
-    return Math.max(MIN_GROUPS, Math.min(MAX_GROUPS, n));
-  }
+  let lastValidCount = MIN_GROUPS;
 
-  function createRows() {
-    const boundedNum = clamp(numGroupsInput.value);
-    numGroupsInput.value = boundedNum;               // keep the UI in sync
+  function createRows(count) {
     inputTableBody.innerHTML = '';
-    for (let i = 1; i <= boundedNum; i++) {
+    for (let i = 1; i <= count; i++) {
       const row = document.createElement('tr');
       row.innerHTML = `
         <td>${i}</td>
@@ -117,17 +111,42 @@
     }
   }
 
+  function toIntOrNull(s) {
+    const n = parseInt(s, 10);
+    return Number.isNaN(n) ? null : n;
+  }
+
   // Initial render
-  numGroupsInput.value = clamp(numGroupsInput.value || MIN_GROUPS);
-  createRows();
+  const init = toIntOrNull(numGroupsInput.value);
+  lastValidCount = (init && init >= MIN_GROUPS && init <= MAX_GROUPS) ? init : MIN_GROUPS;
+  numGroupsInput.value = lastValidCount;
+  createRows(lastValidCount);
 
-  // REACTIVE as-you-type update (this is the “typing reactive”)
-  numGroupsInput.addEventListener('input', createRows);
+  // As-you-type: do NOT clamp or overwrite. Allow empty while editing.
+  numGroupsInput.addEventListener('input', () => {
+    const raw = numGroupsInput.value;      // may be '', '5', '25', etc.
+    if (raw === '') return;                // let user backspace to empty
+    const n = toIntOrNull(raw);
+    if (n !== null && n >= MIN_GROUPS && n <= MAX_GROUPS) {
+      lastValidCount = n;
+      createRows(n);                       // update rows only when valid
+    }
+  });
 
-  // Final clamp if the user leaves an out-of-range value
+  // On blur: clamp and render to ensure we end with a valid value
   numGroupsInput.addEventListener('blur', () => {
-    numGroupsInput.value = clamp(numGroupsInput.value);
-    createRows();
+    let raw = numGroupsInput.value;
+    if (raw === '') {
+      numGroupsInput.value = lastValidCount;
+      createRows(lastValidCount);
+      return;
+    }
+    let n = toIntOrNull(raw);
+    if (n === null) n = lastValidCount;
+    n = Math.min(MAX_GROUPS, Math.max(MIN_GROUPS, n));
+    lastValidCount = n;
+    numGroupsInput.value = n;
+    createRows(n);
   });
 
   // Perform calculations
