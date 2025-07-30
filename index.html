@@ -62,7 +62,7 @@
     <p>
         Use this tool to combine the sample size (<em>n</em>), mean and standard deviation (SD) of up to 10 subgroups and obtain the overall mean, standard deviation and total sample size. All inputs are required for each subgroup. The calculations use the pooled sample variance formula.
     </p>
-    <label for="numGroups"><strong>Number of subgroups (2–10):</strong></label>
+    <label for="numGroups"><strong>Number of subgroup (2–10):</strong></label>
 <input id="numGroups"
        type="number"
        min="2"
@@ -87,19 +87,25 @@
     </table>
     <button id="calculateBtn" class="btn">Calculate</button>
     <div id="results" class="result"></div>
-   <script>
-(function () {
+    <script>
+(function() {
   const MIN_GROUPS = 2;
   const MAX_GROUPS = 10;
 
   const numGroupsInput = document.getElementById('numGroups');
-  const inputTableBody = document.querySelector('#inputTable tbody');
+  const inputTableBody = document.getElementById('inputTable').querySelector('tbody');
 
-  let lastValidCount = MIN_GROUPS;
+  function clamp(v) {
+    const n = parseInt(v, 10);
+    if (Number.isNaN(n)) return MIN_GROUPS;
+    return Math.max(MIN_GROUPS, Math.min(MAX_GROUPS, n));
+  }
 
-  function createRows(count) {
+  function createRows() {
+    const boundedNum = clamp(numGroupsInput.value);
+    numGroupsInput.value = boundedNum;               // keep the UI in sync
     inputTableBody.innerHTML = '';
-    for (let i = 1; i <= count; i++) {
+    for (let i = 1; i <= boundedNum; i++) {
       const row = document.createElement('tr');
       row.innerHTML = `
         <td>${i}</td>
@@ -111,42 +117,17 @@
     }
   }
 
-  function toIntOrNull(s) {
-    const n = parseInt(s, 10);
-    return Number.isNaN(n) ? null : n;
-  }
-
   // Initial render
-  const init = toIntOrNull(numGroupsInput.value);
-  lastValidCount = (init && init >= MIN_GROUPS && init <= MAX_GROUPS) ? init : MIN_GROUPS;
-  numGroupsInput.value = lastValidCount;
-  createRows(lastValidCount);
+  numGroupsInput.value = clamp(numGroupsInput.value || MIN_GROUPS);
+  createRows();
 
-  // As-you-type: do NOT clamp or overwrite. Allow empty while editing.
-  numGroupsInput.addEventListener('input', () => {
-    const raw = numGroupsInput.value;      // may be '', '5', '25', etc.
-    if (raw === '') return;                // let user backspace to empty
-    const n = toIntOrNull(raw);
-    if (n !== null && n >= MIN_GROUPS && n <= MAX_GROUPS) {
-      lastValidCount = n;
-      createRows(n);                       // update rows only when valid
-    }
-  });
+  // REACTIVE as-you-type update (this is the “typing reactive”)
+  numGroupsInput.addEventListener('input', createRows);
 
-  // On blur: clamp and render to ensure we end with a valid value
+  // Final clamp if the user leaves an out-of-range value
   numGroupsInput.addEventListener('blur', () => {
-    let raw = numGroupsInput.value;
-    if (raw === '') {
-      numGroupsInput.value = lastValidCount;
-      createRows(lastValidCount);
-      return;
-    }
-    let n = toIntOrNull(raw);
-    if (n === null) n = lastValidCount;
-    n = Math.min(MAX_GROUPS, Math.max(MIN_GROUPS, n));
-    lastValidCount = n;
-    numGroupsInput.value = n;
-    createRows(n);
+    numGroupsInput.value = clamp(numGroupsInput.value);
+    createRows();
   });
 
   // Perform calculations
