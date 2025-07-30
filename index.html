@@ -88,92 +88,109 @@
     <button id="calculateBtn" class="btn">Calculate</button>
     <div id="results" class="result"></div>
     <script>
-    (function() {
-        const numGroupsInput = document.getElementById('numGroups');
-        const inputTableBody = document.getElementById('inputTable').querySelector('tbody');
+    <script>
+(function() {
+  const MIN_GROUPS = 2;
+  const MAX_GROUPS = 10;
 
-        function createRows() {
-            const num = parseInt(numGroupsInput.value) || 0;
-            // Enforce bounds 1‑10
-            const boundedNum = Math.max(1, Math.min(10, num));
-            numGroupsInput.value = boundedNum;
-            // Clear existing rows
-            inputTableBody.innerHTML = '';
-            for (let i = 1; i <= boundedNum; i++) {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${i}</td>
-                    <td><input type="number" min="0" step="1" id="n_${i}" required></td>
-                    <td><input type="number" step="any" id="mean_${i}" required></td>
-                    <td><input type="number" step="any" id="sd_${i}" required></td>
-                `;
-                inputTableBody.appendChild(row);
-            }
-        }
+  const numGroupsInput = document.getElementById('numGroups');
+  const inputTableBody = document.getElementById('inputTable').querySelector('tbody');
 
-        // Initialize on page load
-        createRows();
-        // Update rows when number of groups changes
-        numGroupsInput.addEventListener('change', createRows);
-        numGroupsInput.addEventListener('input', createRows);
+  function clamp(v) {
+    const n = parseInt(v, 10);
+    if (Number.isNaN(n)) return MIN_GROUPS;
+    return Math.max(MIN_GROUPS, Math.min(MAX_GROUPS, n));
+  }
 
-        // Perform calculations
-        document.getElementById('calculateBtn').addEventListener('click', function() {
-            const num = parseInt(numGroupsInput.value) || 0;
-            if (num < 1 || num > 10) {
-                alert('Please specify a number of subgroups between 1 and 10.');
-                return;
-            }
-            let totalN = 0;
-            let weightedMeanNumerator = 0;
-            const ns = [];
-            const means = [];
-            const sds = [];
-            for (let i = 1; i <= num; i++) {
-                const nVal = document.getElementById(`n_${i}`).value;
-                const meanVal = document.getElementById(`mean_${i}`).value;
-                const sdVal = document.getElementById(`sd_${i}`).value;
-                const n = parseFloat(nVal);
-                const m = parseFloat(meanVal);
-                const sd = parseFloat(sdVal);
-                if (isNaN(n) || isNaN(m) || isNaN(sd)) {
-                    alert('Please fill in all fields for subgroup ' + i + '.');
-                    return;
-                }
-                if (n < 0) {
-                    alert('Sample size cannot be negative (group ' + i + ').');
-                    return;
-                }
-                ns.push(n);
-                means.push(m);
-                sds.push(sd);
-                totalN += n;
-                weightedMeanNumerator += n * m;
-            }
-            if (totalN <= 0) {
-                alert('Total sample size must be greater than 0.');
-                return;
-            }
-            const overallMean = weightedMeanNumerator / totalN;
-            let sumTerms = 0;
-            for (let i = 0; i < num; i++) {
-                const ni = ns[i];
-                const sd_i = sds[i];
-                const mean_i = means[i];
-                // (n_i - 1) * SD_i^2 + n_i * (mean_i - overallMean)^2
-                sumTerms += (ni - 1) * Math.pow(sd_i, 2) + ni * Math.pow(mean_i - overallMean, 2);
-            }
-            const overallVariance = sumTerms / (totalN - 1);
-            const overallSD = Math.sqrt(overallVariance);
-            const resultsDiv = document.getElementById('results');
-            resultsDiv.innerHTML = '';
-            const resultLines = [];
-            resultLines.push(`Total sample size (N): ${totalN.toFixed(0)}`);
-            resultLines.push(`Overall mean: ${overallMean.toFixed(4)}`);
-            resultLines.push(`Overall standard deviation: ${overallSD.toFixed(4)}`);
-            resultsDiv.innerHTML = resultLines.map(l => `<p>${l}</p>`).join('');
-        });
-    })();
-    </script>
+  function createRows() {
+    const boundedNum = clamp(numGroupsInput.value);
+    numGroupsInput.value = boundedNum;               // keep the UI in sync
+    inputTableBody.innerHTML = '';
+    for (let i = 1; i <= boundedNum; i++) {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${i}</td>
+        <td><input type="number" min="2" step="1" id="n_${i}" required></td>
+        <td><input type="number" step="any" id="mean_${i}" required></td>
+        <td><input type="number" step="any" id="sd_${i}" required></td>
+      `;
+      inputTableBody.appendChild(row);
+    }
+  }
+
+  // Initial render
+  numGroupsInput.value = clamp(numGroupsInput.value || MIN_GROUPS);
+  createRows();
+
+  // REACTIVE as-you-type update (this is the “typing reactive”)
+  numGroupsInput.addEventListener('input', createRows);
+
+  // Final clamp if the user leaves an out-of-range value
+  numGroupsInput.addEventListener('blur', () => {
+    numGroupsInput.value = clamp(numGroupsInput.value);
+    createRows();
+  });
+
+  // Perform calculations
+  document.getElementById('calculateBtn').addEventListener('click', function() {
+    const num = clamp(numGroupsInput.value);
+    if (num < MIN_GROUPS || num > MAX_GROUPS) {
+      alert(`Please specify a number of subgroups between ${MIN_GROUPS} and ${MAX_GROUPS}.`);
+      return;
+    }
+
+    let totalN = 0;
+    let weightedMeanNumerator = 0;
+    const ns = [];
+    const means = [];
+    const sds = [];
+
+    for (let i = 1; i <= num; i++) {
+      const nVal = document.getElementById(`n_${i}`).value;
+      const meanVal = document.getElementById(`mean_${i}`).value;
+      const sdVal = document.getElementById(`sd_${i}`).value;
+
+      const n = parseFloat(nVal);
+      const m = parseFloat(meanVal);
+      const sd = parseFloat(sdVal);
+
+      if (isNaN(n) || isNaN(m) || isNaN(sd)) {
+        alert('Please fill in all fields for subgroup ' + i + '.');
+        return;
+      }
+      if (n < 2) {
+        alert('Sample size must be at least 2 for subgroup ' + i + ' (SD is undefined for n < 2).');
+        return;
+      }
+
+      ns.push(n); means.push(m); sds.push(sd);
+      totalN += n;
+      weightedMeanNumerator += n * m;
+    }
+
+    if (totalN <= 0) {
+      alert('Total sample size must be greater than 0.');
+      return;
+    }
+
+    const overallMean = weightedMeanNumerator / totalN;
+
+    let sumTerms = 0;
+    for (let i = 0; i < num; i++) {
+      const ni = ns[i], sd_i = sds[i], mean_i = means[i];
+      sumTerms += (ni - 1) * Math.pow(sd_i, 2) + ni * Math.pow(mean_i - overallMean, 2);
+    }
+    const overallVariance = sumTerms / (totalN - 1);
+    const overallSD = Math.sqrt(overallVariance);
+
+    const resultsDiv = document.getElementById('results');
+    resultsDiv.innerHTML = [
+      `<p>Total sample size (N): ${totalN.toFixed(0)}</p>`,
+      `<p>Overall mean: ${overallMean.toFixed(4)}</p>`,
+      `<p>Overall standard deviation: ${overallSD.toFixed(4)}</p>`
+    ].join('');
+  });
+})();
+</script>
 </body>
 </html>
